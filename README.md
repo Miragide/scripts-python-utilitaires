@@ -25,3 +25,12 @@ README de chaque dossier pour les commandes détaillées et les dépendances.
 - Installez les dépendances mentionnées dans chaque README (`pip install ...`).
 - Sauvegardez vos fichiers sources avant d'exécuter un script qui modifie les
   images/vidéos de manière destructive.
+
+## Pourquoi je vois des doublons ou des conflits ?
+- Les dossiers ont été renommés en kebab-case (ex. `aborescence maker` →
+  `arborescence-maker`). Si votre branche locale part d'un commit plus ancien
+  avec les anciens noms, GitHub affiche alors **l'ancien dossier et le nouveau**
+  au lieu de les fusionner, d'où les doublons.
+- Pour éviter les conflits, mettez votre branche à jour avant de pousser
+  (`git pull --rebase origin <branche>`), puis supprimez les anciens dossiers
+  locaux résiduels s'il y en a encore avant de relancer le commit.
