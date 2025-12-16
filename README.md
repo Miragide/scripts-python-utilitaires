@@ -1,5 +1,11 @@
 # Scripts Python utilitaires
 
+Je suis designer et je n'ai que des bases en programmation.
+J'explore comment l'IA peut aider des amateurs en programmatoin comme moi à coder ce dont on a besoin.
+Vous trouverez donc ici les résultats fonctionnels de mes expériences avec l'IA pour coder des mini logiciels utiles au traitement de diverses tâches.
+Sans prétention.
+Ce paragraphe mis à part, tout ce que vous trouverez dans ce répertoire est mis à jour automatiquement par l'IA GPT Codex.
+
 Chaque sous-dossier contient un script autonome (ou une paire de scripts)
 dédié à une tâche de conversion ou de traitement. Reportez-vous aux README de
 chaque répertoire pour les dépendances et instructions d'exécution.
