@@ -28,3 +28,4 @@ chaque répertoire pour les dépendances et instructions d'exécution.
 - `vcard-to-csv/` : export de contacts vCard en CSV.
 - `verification-numero-secu/` : contrôle de NIR dans un CSV.
 - `video-montage-photos-to-video/` : recadrage et concaténation vidéo carrée.
+- `video-loop-invisible/` : rend une vidéo loopable via superposition progressive du début sur la fin.
