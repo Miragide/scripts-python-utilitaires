@@ -24,6 +24,7 @@ chaque répertoire pour les dépendances et instructions d'exécution.
 - `mp3 to mp4 pour podcast son avec image/` : création d'une vidéo MP4 à partir d'un audio et d'une image.
 - `suppression des blancs/` : suppression automatique des passages silencieux dans une vidéo.
 - `transcription-mp3-mp4-to-txt/` : transcription Whisper d'audios/vidéos.
+- `transcription-musique-vers-csv-4s/` : transcription d'une musique en CSV de paroles par tranches de 4 secondes (adapté aux clips 5s avec fondu 1s).
 - `wp xml export to markdown/` : conversion d'exports XML WordPress en Markdown.
 - `vcard-to-csv/` : export de contacts vCard en CSV.
 - `verification-numero-secu/` : contrôle de NIR dans un CSV.
