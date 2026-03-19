@@ -1,177 +1,218 @@
 #!/usr/bin/env python3
+"""
+image_to_video.py
+-----------------
+Crée une vidéo MP4 720p à partir de la première image et du premier fichier
+audio trouvés à la racine du répertoire courant.
+
+Formats image supportés : JPEG, JPG, PNG, BMP, WEBP, TIFF
+Formats audio supportés  : MP3, WAV, AAC, OGG, FLAC, M4A
+
+Usage :
+    python image_to_video.py               # utilise le répertoire courant
+    python image_to_video.py /chemin/dossier
+"""
+
+import shutil
 import subprocess
-import json
-from pathlib import Path
 import sys
+import tempfile
+from pathlib import Path
 
-# Extensions supportées
-AUDIO_EXTS = {'.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.wma'}
-IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp', '.tiff'}
+from PIL import Image
 
-def check_ffmpeg():
-    """Vérifie que FFmpeg est installé"""
-    try:
-        subprocess.run(['ffmpeg', '-version'], 
-                      capture_output=True, check=True)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ FFmpeg n'est pas installé ou pas dans le PATH")
-        print("   Téléchargez-le sur : https://ffmpeg.org/download.html")
-        return False
 
-def get_duration(file):
-    """Obtient la durée d'un fichier média"""
-    try:
-        cmd = ['ffprobe', '-v', 'error', '-show_entries', 
-               'format=duration', '-of', 'json', str(file)]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        data = json.loads(result.stdout)
-        return float(data['format']['duration'])
-    except Exception as e:
-        print(f"⚠️  Impossible de lire la durée de {file.name}: {e}")
-        return None
+# ── Paramètres de sortie (YouTube 720p) ────────────────────────────────────────
+OUTPUT_WIDTH = 1280
+OUTPUT_HEIGHT = 720
+OUTPUT_FILE = "output_video.mp4"
 
-def validate_file(file, file_type):
-    """Valide qu'un fichier existe et n'est pas corrompu"""
-    if not file.exists():
-        print(f"❌ Le fichier {file_type} n'existe plus: {file.name}")
-        return False
-    
-    if file.stat().st_size == 0:
-        print(f"❌ Le fichier {file_type} est vide: {file.name}")
-        return False
-    
-    return True
+IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".bmp", ".webp", ".tiff", ".tif"}
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".aac", ".ogg", ".flac", ".m4a"}
 
-def main():
-    # Vérifier FFmpeg
-    if not check_ffmpeg():
-        sys.exit(1)
-    
-    # Récupérer les fichiers dans le répertoire courant uniquement
-    current_dir = Path('.')
-    
-    audio_file = next((f for f in current_dir.iterdir() 
-                       if f.is_file() and f.suffix.lower() in AUDIO_EXTS), None)
-    
-    image_file = next((f for f in current_dir.iterdir() 
-                       if f.is_file() and f.suffix.lower() in IMAGE_EXTS), None)
-    
-    # Vérifications
-    if not audio_file:
-        print(f"❌ Aucun fichier audio trouvé")
-        print(f"   Formats supportés: {', '.join(AUDIO_EXTS)}")
-        sys.exit(1)
-    
-    if not image_file:
-        print(f"❌ Aucune image trouvée")
-        print(f"   Formats supportés: {', '.join(IMAGE_EXTS)}")
-        sys.exit(1)
-    
-    # Valider les fichiers
-    if not validate_file(audio_file, "audio"):
-        sys.exit(1)
-    
-    if not validate_file(image_file, "image"):
-        sys.exit(1)
-    
-    print(f"🎵 Audio: {audio_file.name}")
-    print(f"🖼️  Image: {image_file.name}")
-    
-    # Obtenir la durée de l'audio
-    duration = get_duration(audio_file)
-    if duration:
-        minutes = int(duration // 60)
-        seconds = int(duration % 60)
-        print(f"⏱️  Durée audio: {minutes}min {seconds}s ({duration:.2f}s)")
-    else:
-        print("⚠️  Impossible de déterminer la durée, mais on continue...")
-    
-    # Nom du fichier de sortie (éviter les caractères spéciaux)
-    output_name = "".join(c for c in audio_file.stem if c.isalnum() or c in (' ', '-', '_'))
-    output = f"output_{output_name}.mp4"
-    
-    # Vérifier si le fichier existe déjà
-    if Path(output).exists():
-        print(f"⚠️  Le fichier {output} existe déjà")
-        try:
-            response = input("   Voulez-vous l'écraser ? (o/n): ").lower()
-            if response != 'o':
-                print("❌ Opération annulée")
-                sys.exit(0)
-        except:
-            pass  # Si input ne fonctionne pas, on continue
-    
-    # Commande FFmpeg CORRIGÉE
+
+# ── Recherche des fichiers ──────────────────────────────────────────────────────
+def find_first_file(directory: Path, extensions: set[str]) -> Path | None:
+    """Retourne le premier fichier (ordre alphabétique) dont l'extension correspond."""
+    candidates = sorted(
+        f for f in directory.iterdir() if f.is_file() and f.suffix.lower() in extensions
+    )
+    return candidates[0] if candidates else None
+
+
+# ── Redimensionnement de l'image ───────────────────────────────────────────────
+def resize_image(
+    image_path: Path,
+    output_path: Path,
+    width: int = OUTPUT_WIDTH,
+    height: int = OUTPUT_HEIGHT,
+) -> None:
+    """
+    Ouvre l'image, la redimensionne en 1280×720 en remplissant tout le cadre
+    (crop centré si les proportions diffèrent), puis la sauvegarde en JPEG.
+    """
+    with Image.open(image_path) as img:
+        img = img.convert("RGB")
+        src_w, src_h = img.size
+
+        # Calcul du ratio pour couvrir entièrement le cadre (cover)
+        ratio_w = width / src_w
+        ratio_h = height / src_h
+        ratio = max(ratio_w, ratio_h)
+
+        new_w = round(src_w * ratio)
+        new_h = round(src_h * ratio)
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+
+        # Crop centré pour obtenir exactement width × height
+        left = (new_w - width) // 2
+        top = (new_h - height) // 2
+        img = img.crop((left, top, left + width, top + height))
+
+        img.save(output_path, "JPEG", quality=95)
+        print(f"  Image redimensionnée : {src_w}×{src_h} → {width}×{height}")
+
+
+# ── Durée de l'audio via ffprobe ───────────────────────────────────────────────
+def get_audio_duration(audio_path: Path) -> float:
+    """
+    Retourne la durée en secondes du fichier audio grâce à ffprobe.
+    Lève une RuntimeError si ffprobe échoue.
+    """
     cmd = [
-        'ffmpeg',
-        '-y',  # Écraser sans demander
-        '-loop', '1',
-        '-framerate', '1',  # 1 fps pour image fixe
-        '-i', str(image_file),
-        '-i', str(audio_file),
-        '-c:v', 'libx264',
-        '-tune', 'stillimage',
-        '-preset', 'medium',
-        '-crf', '23',
-        '-c:a', 'copy',  # Copie l'audio sans ré-encoder
-        '-pix_fmt', 'yuv420p',
-        '-movflags', 'faststart',  # SANS le +
-        '-shortest',  # Option globale, pas dans -fflags
-        '-max_muxing_queue_size', '9999',
-        output
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(audio_path),
     ]
-    
-    print(f"\n⏳ Création de la vidéo en cours...")
-    print(f"   (Cela peut prendre quelques instants pour {minutes}min d'audio)\n")
-    
-    try:
-        # Exécuter FFmpeg
-        result = subprocess.run(
-            cmd, 
-            capture_output=True,
-            text=True,
-            timeout=1800  # 30 minutes max pour 2h30 d'audio
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(
+            f"ffprobe n'a pas pu lire la durée de '{audio_path}'.\n{result.stderr}"
         )
-        
-        if result.returncode != 0:
-            print("\n❌ Erreur lors de la création de la vidéo")
-            print(result.stderr)
-            sys.exit(1)
-        
-        # Vérifier le fichier de sortie
-        output_path = Path(output)
-        if not output_path.exists():
-            print("❌ Le fichier de sortie n'a pas été créé")
-            sys.exit(1)
-        
-        output_size = output_path.stat().st_size / (1024 * 1024)  # Mo
-        output_duration = get_duration(output_path)
-        
-        print(f"\n✅ Vidéo créée avec succès : {output}")
-        print(f"   Taille: {output_size:.2f} Mo")
-        
-        if output_duration and duration:
-            diff = abs(output_duration - duration)
-            minutes_out = int(output_duration // 60)
-            seconds_out = int(output_duration % 60)
-            
-            if diff > 1:  # Plus d'1 seconde de différence
-                print(f"⚠️  Différence de durée détectée: {diff:.2f}s")
-                print(f"   Audio original: {minutes}min {seconds}s")
-                print(f"   Vidéo créée: {minutes_out}min {seconds_out}s")
-            else:
-                print(f"   Durée: {minutes_out}min {seconds_out}s ✓")
-    
-    except subprocess.TimeoutExpired:
-        print("\n❌ Timeout : l'opération a pris trop de temps (>30min)")
+    duration = float(result.stdout.strip())
+    print(f"  Durée audio détectée : {duration:.2f} s")
+    return duration
+
+
+# ── Création de la vidéo via FFmpeg ────────────────────────────────────────────
+def build_video(image_path: Path, audio_path: Path, output_path: Path) -> None:
+    """
+    Appelle ffmpeg pour assembler l'image fixe et l'audio en MP4 720p.
+
+    Correctifs écran noir :
+    - On récupère la durée exacte avec ffprobe et on passe -t <durée>
+      au lieu de -shortest (qui peut couper avant la première frame à 1 fps).
+    - On utilise 25 fps (standard) pour garantir qu'au moins une frame
+      soit encodée avant la fin du flux.
+    """
+    duration = get_audio_duration(audio_path)
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        # Image fixe en boucle à 25 fps — garantit que la frame est bien encodée
+        "-loop",
+        "1",
+        "-framerate",
+        "25",
+        "-i",
+        str(image_path),
+        # Fichier audio
+        "-i",
+        str(audio_path),
+        # Vidéo : H.264, tune stillimage, pixel format compatible
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-tune",
+        "stillimage",
+        "-crf",
+        "23",
+        "-vf",
+        (
+            f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=disable,"
+            "format=yuv420p"
+        ),
+        # Durée exacte issue de ffprobe — évite l'écran noir de -shortest
+        "-t",
+        str(duration),
+        # Audio : AAC 192 kbps stéréo
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-ac",
+        "2",
+        # Optimisation pour le streaming / upload YouTube
+        "-movflags",
+        "+faststart",
+        str(output_path),
+    ]
+
+    print("\n  Lancement de FFmpeg…")
+    print("  Commande :", " ".join(cmd))
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        print("\n── Erreur FFmpeg ──────────────────────────────")
+        print(result.stderr)
+        raise RuntimeError("FFmpeg a échoué. Voir le message ci-dessus.")
+
+    print("  FFmpeg terminé avec succès.")
+
+
+# ── Point d'entrée ─────────────────────────────────────────────────────────────
+def main() -> None:
+    # Répertoire cible (argument optionnel, sinon répertoire courant)
+    directory = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
+
+    if not directory.is_dir():
+        print(f"Erreur : '{directory}' n'est pas un répertoire valide.")
         sys.exit(1)
-    except KeyboardInterrupt:
-        print("\n❌ Opération annulée par l'utilisateur")
+
+    print(f"Dossier analysé : {directory}\n")
+
+    # ── Recherche des fichiers ─────────────────────────────────────────────────
+    image_file = find_first_file(directory, IMAGE_EXTENSIONS)
+    audio_file = find_first_file(directory, AUDIO_EXTENSIONS)
+
+    if not image_file:
+        print(f"Aucune image trouvée ({', '.join(IMAGE_EXTENSIONS)}).")
         sys.exit(1)
-    except Exception as e:
-        print(f"\n❌ Erreur inattendue: {e}")
+    if not audio_file:
+        print(f"Aucun fichier audio trouvé ({', '.join(AUDIO_EXTENSIONS)}).")
         sys.exit(1)
+
+    print(f"  Image  : {image_file.name}")
+    print(f"  Audio  : {audio_file.name}")
+
+    # ── Redimensionnement dans un fichier temporaire ───────────────────────────
+    tmp_dir = Path(tempfile.mkdtemp())
+    try:
+        resized_image = tmp_dir / "frame.jpg"
+        resize_image(image_file, resized_image)
+
+        # ── Création de la vidéo ───────────────────────────────────────────────
+        output_path = directory / OUTPUT_FILE
+        build_video(resized_image, audio_file, output_path)
+
+        size_mb = output_path.stat().st_size / 1_048_576
+        print(f"\n✅ Vidéo créée : {output_path}")
+        print(f"   Taille      : {size_mb:.1f} Mo")
+        print(f"   Résolution  : {OUTPUT_WIDTH}×{OUTPUT_HEIGHT} (720p)")
+        print("   Codec vidéo : H.264 (libx264)")
+        print("   Codec audio : AAC 192 kbps")
+
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     main()
