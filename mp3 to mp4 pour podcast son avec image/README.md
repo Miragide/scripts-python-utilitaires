@@ -1,30 +1,29 @@
 # MP3 vers MP4 (podcast audio + image)
 
-Ce script crée rapidement une vidéo MP4 à partir d'un fichier audio (podcast, extrait musical, etc.) et d'une image fixe pour l'illustration.
+Ce script crée une vidéo MP4 720p à partir de la première image et du premier fichier audio trouvés dans un dossier.
 
 ## Prérequis
-- Python 3.8 ou plus récent.
+- Python 3.10 ou plus récent.
 - [FFmpeg](https://ffmpeg.org/download.html) installé et accessible dans le `PATH`.
-- Un fichier audio et une image dans le même dossier que `script.py`.
+- [Pillow](https://pypi.org/project/Pillow/) installé (`pip install pillow`).
 
 ## Formats pris en charge
-- **Audio** : .mp3, .wav, .m4a, .aac, .ogg, .flac, .wma
-- **Image** : .jpg, .jpeg, .png, .bmp, .gif, .webp, .tiff
+- **Images** : `.jpeg`, `.jpg`, `.png`, `.bmp`, `.webp`, `.tiff`, `.tif`
+- **Audio** : `.mp3`, `.wav`, `.aac`, `.ogg`, `.flac`, `.m4a`
 
 ## Utilisation
-1. Placez un fichier audio et une image dans le répertoire du script.
-2. Exécutez :
-   ```bash
-   python3 script.py
-   ```
-3. Confirmez l'écrasement si un fichier de sortie existe déjà.
+```bash
+python3 script.py
+python3 script.py /chemin/du/dossier
+```
 
 Le script :
-- vérifie la présence de FFmpeg et la validité des fichiers,
-- reprend la première image et le premier fichier audio trouvés dans le dossier,
-- crée une vidéo `output_<nom_audio>.mp4` en copiant l'audio sans ré-encodage et en appliquant l'image comme visuel fixe.
+- sélectionne la première image et le premier audio par ordre alphabétique ;
+- redimensionne l'image en 1280×720 (mode cover avec crop centré) ;
+- lit la durée exacte de l'audio avec `ffprobe` ;
+- génère un MP4 H.264/AAC (`output_video.mp4`) optimisé pour l'upload YouTube.
 
-## Notes
-- La durée de la vidéo est automatiquement calée sur celle de l'audio.
-- L'encodage vidéo utilise `libx264` avec un preset « stillimage » optimisé pour les images fixes.
-- Une opération peut durer plusieurs minutes selon la longueur de l'audio et la puissance de la machine.
+## Correctif principal (écran noir)
+Pour éviter les cas où la vidéo sortait noire :
+- la durée est imposée avec `-t <durée_audio>` (plutôt que `-shortest`) ;
+- la source image est injectée à `25 fps` pour garantir l'encodage d'au moins une frame visible.
