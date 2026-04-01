@@ -31,3 +31,5 @@ chaque répertoire pour les dépendances et instructions d'exécution.
 - `video-montage-photos-to-video/` : recadrage et concaténation vidéo carrée.
 - `video-loop-invisible/` : rend une vidéo loopable via superposition progressive du début sur la fin.
 - `merge-videos-crossfade/` : fusion de vidéos avec fondu enchaîné (cross-fade).
+
+- `wp-heavy-files-finder/` : diagnostic des dossiers et fichiers lourds d'une installation WordPress.
