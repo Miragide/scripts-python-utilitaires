@@ -12,7 +12,7 @@ chaque répertoire pour les dépendances et instructions d'exécution.
 
 - `arborescence-maker/` : affichage d'une arborescence de dossiers.
 - `fusion-pdf/` : fusion de PDF en un seul fichier.
-- `google-forms-quiz-communication-corporate/` : génération d'un QCM Google Forms (Apps Script) de 5 questions avec mode quiz.
+- `Apps Script Google Forms quiz maker/` : modèle Apps Script Google Forms pour générer automatiquement des QCM (exemple 5 questions) et servir de base de prompt IA.
 - `image-to-pdf/` : regroupement d'images en PDF.
 - `image-to-txt/` : extraction OCR avec EasyOCR.
 - `mp4-to-mp3/` : conversion audio depuis des vidéos MP4.
